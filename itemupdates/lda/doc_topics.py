@@ -1,12 +1,10 @@
 import collections
-import json
 import operator
 import random
 import re
 import sys
 
-import numpy
-import scipy.special
+import numpy as np
 
 fst = operator.itemgetter(0)
 snd = operator.itemgetter(1)
@@ -39,20 +37,26 @@ def infer_topics(doc, topics, alpha=0.0001, iterations=10000, burn=1000, thin=10
     topics = list(topics.values())
     K = len(topics)
 
+    words = list(set(doc))
+    doc = np.array([words.index(w) for w in doc], dtype=int)
+    topics = np.array([[topic.get(w, 0) for w in words]
+                          for topic in topics])
+
     if K == 0: return {}
 
     n_thetas = 0
-    sum_thetas = numpy.zeros(K)
-    theta = numpy.random.dirichlet(alpha + numpy.zeros(K))
-    zs = [None for _ in doc]
+    sum_thetas = np.zeros(K)
+    theta = np.random.dirichlet(alpha + np.zeros(K))
+    zs = np.empty(len(doc), dtype=int)
+    topic_counts = np.empty(K, dtype=int)
     for j in range(iterations):
         for i,w in enumerate(doc):
-            ps = numpy.array([theta[k] * topics[k].get(w, 0) for k in range(K)])
-            zs[i] = numpy.random.multinomial(1, ps / ps.sum()).argmax()
+            ps = theta * topics[:, w]
+            zs[i] = np.random.multinomial(1, ps / ps.sum()).argmax()
 
-        topic_counts = numpy.zeros(K)
+        topic_counts.fill(0)
         for z in zs: topic_counts[z] += 1
-        theta = numpy.random.dirichlet(alpha + topic_counts)
+        theta = np.random.dirichlet(alpha + topic_counts)
 
         if j > burn and j % thin == 0:
             sum_thetas += theta
@@ -71,19 +75,19 @@ def infer_topics_collapsed(doc, topics, alpha=0.0001, iterations=10000, burn=100
     if K == 0: return {}
 
     n_thetas = 0
-    sum_thetas = numpy.zeros(K)
+    sum_thetas = np.zeros(K)
     zs = [None for _ in doc]
-    topic_counts = numpy.zeros(K)
+    topic_counts = np.zeros(K)
     for j in range(iterations):
         for i,w in enumerate(doc):
             if zs[i] is not None: topic_counts[zs[i]] -= 1
-            ps = numpy.array([topics[k].get(w, 0) * factorial(topic_counts[k])
+            ps = np.array([topics[k].get(w, 0) * factorial(topic_counts[k])
                               for k in range(K)])
-            zs[i] = numpy.random.multinomial(1, ps / ps.sum()).argmax()
+            zs[i] = np.random.multinomial(1, ps / ps.sum()).argmax()
             topic_counts[zs[i]] += 1
 
         if j > burn and j % thin == 0:
-            sum_thetas += numpy.random.dirichlet(alpha + topic_counts)
+            sum_thetas += np.random.dirichlet(alpha + topic_counts)
             n_thetas += 1
 
     theta = sum_thetas / n_thetas
@@ -96,12 +100,12 @@ def generate_doc(topics, alpha=0.0001):
 
     N = 6
 
-    theta = numpy.random.dirichlet(alpha + numpy.zeros(K))
+    theta = np.random.dirichlet(alpha + np.zeros(K))
     print(sorted_by_value({topic_ids[i]: weight for i,weight in enumerate(theta) if weight > 0.05}))
 
     doc = []
     for _ in range(N):
-        z = numpy.random.multinomial(1, theta).argmax()
+        z = np.random.multinomial(1, theta).argmax()
         topic_words = sorted_by_value(topics[z])
         p = random.random()
         for word,weight in topic_words:
@@ -115,8 +119,8 @@ def test(topics, alpha=0.0001):
     print(doc)
     doc_topics = infer_topics(doc, topics, alpha=alpha)
     print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
-    doc_topics = infer_topics_collapsed(doc, topics, alpha=alpha)
-    print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
+    # doc_topics = infer_topics_collapsed(doc, topics, alpha=alpha)
+    # print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
 
 topic_words = {}
 word_topics = collections.defaultdict(dict)
