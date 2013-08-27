@@ -3,8 +3,11 @@ import operator
 import random
 import re
 import sys
+import time
 
 import numpy as np
+
+import clda
 
 fst = operator.itemgetter(0)
 snd = operator.itemgetter(1)
@@ -65,6 +68,23 @@ def infer_topics(doc, topics, alpha=0.0001, iterations=10000, burn=1000, thin=10
     theta = sum_thetas / n_thetas
     return {topic_ids[i]: weight for i,weight in enumerate(theta)}
 
+def infer_topics_c(doc, topics):
+    doc, topics = prep(doc, topics)
+
+    topic_ids = list(topics.keys())
+    topics = list(topics.values())
+
+    words = list(set(doc))
+    doc = [words.index(w) for w in doc]
+    topics = [[topic.get(w, 0) for w in words]
+              for topic in topics]
+
+    t = time.time()
+    theta = clda.infer_topics_gibbs(doc, topics)
+    print(time.time() - t)
+
+    return {topic_ids[i]: weight for i,weight in enumerate(theta)}
+
 def infer_topics_collapsed(doc, topics, alpha=0.0001, iterations=10000, burn=1000, thin=100):
     doc, topics = prep(doc, topics)
 
@@ -117,8 +137,16 @@ def generate_doc(topics, alpha=0.0001):
 def test(topics, alpha=0.0001):
     doc = generate_doc(topics, alpha=alpha)
     print(doc)
+
+    t = time.time()
     doc_topics = infer_topics(doc, topics, alpha=alpha)
+    print(time.time() - t)
     print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
+
+    t = time.time()
+    doc_topics = infer_topics_c(doc, topics)
+    print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
+
     # doc_topics = infer_topics_collapsed(doc, topics, alpha=alpha)
     # print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
 
@@ -141,7 +169,6 @@ with open('lda.topToWor.txt') as f:
 doc = [w.lower() for w in sys.argv[1:]]
 
 if doc:
-    import time
     t = time.time()
     doc_topics = infer_topics(doc, topic_words)
     print(time.time() - t)
