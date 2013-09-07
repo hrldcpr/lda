@@ -149,26 +149,42 @@ def test(topics, alpha=0.0001):
     # doc_topics = infer_topics_collapsed(doc, topics, alpha=alpha)
     # print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
 
-topic_words = {}
-# with open('lda-2500') as f:
-with open('lda.topToWor.txt') as f:
+def parse_yahoo(f):
+    topics = {}
     for line in f:
         # topic, words = line.strip().split('\t')
         topic, words = line.strip().split(':', 1)
         # keys have commas and colons so we can't do nice split comprehensions :'(
-        topic_words[topic] = {word: float(weight)
-                              # for word,weight,_ in re.findall(r'(.*?):([\d\.E\-]*?)(,|$)', words.strip('{}'))}
-                              for word,weight in re.findall(r'\((.*?),([\d\.E\-]*?)\)', words.strip('{}'))}
+        topics[topic] = {word: float(weight)
+                         for word,weight in re.findall(r'\((.*?),([\d\.E\-]*?)\)', words.strip('{}'))}
+    return topics
+
+def parse_mahout(f):
+    topics = {}
+    for line in f:
+        topic, words = line.strip().split('\t')
+        # keys have commas and colons so we can't do nice split comprehensions :'(
+        topics[topic] = {word: float(weight)
+                         for word,weight,_ in re.findall(r'(.*?):([\d\.E\-]*?)(,|$)', words.strip('{}'))}
+    return topics
+
+def main():
+    # with open('lda-2500') as f:
+    with open('lda.topToWor.txt') as f:
+        topics = parse_yahoo(f)
+
+    doc = [w.lower() for w in sys.argv[1:]]
+
+    if doc:
+        t = time.time()
+        doc_topics = infer_topics(doc, topics)
+        print(time.time() - t)
+
+        print(sorted_by_value(doc_topics))
+
+    else:
+        test(topics)
 
 
-doc = [w.lower() for w in sys.argv[1:]]
-
-if doc:
-    t = time.time()
-    doc_topics = infer_topics(doc, topic_words)
-    print(time.time() - t)
-
-    print(sorted_by_value(doc_topics))
-
-else:
-    test(topic_words)
+if __name__ == '__main__':
+    main()
