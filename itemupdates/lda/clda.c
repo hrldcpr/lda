@@ -3,9 +3,9 @@
 #include <gsl/gsl_randist.h>
 
 static const double ALPHA = 0.0001;
-static const int ITERATIONS = 1000;
-static const int BURN = 100;
-static const int THIN = 10;
+static const int ITERATIONS = 10000;
+static const int BURN = 1000;
+static const int THIN = 100;
 
 static gsl_rng *rng;
 
@@ -27,10 +27,8 @@ static PyObject *clda_infer_topics_gibbs(PyObject *self, PyObject *args) {
   PyObject *topic0;
   for (k = 0; k < K; k++) {
     topic0 = PySequence_GetItem(topics0, k);
-    for (i = 0; i < V; i++) {
+    for (i = 0; i < V; i++)
       topics[k*V + i] = PyFloat_AsDouble(PySequence_GetItem(topic0, i));
-      //printf("topics[%d][%d] = %f\n", k, i, topics[k*V + i]);
-    }
   }
 
 
@@ -47,7 +45,6 @@ static PyObject *clda_infer_topics_gibbs(PyObject *self, PyObject *args) {
   gsl_ran_dirichlet(rng, K, alpha, theta);
 
   for (j = 0; j < ITERATIONS; j++) {
-    //printf("%d\n", j);
     for (i = 0; i < N; i++) {
       double sum_ps = 0;
       for (k = 0; k < K; k++) {

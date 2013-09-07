@@ -79,9 +79,7 @@ def infer_topics_c(doc, topics):
     topics = [[topic.get(w, 0) for w in words]
               for topic in topics]
 
-    t = time.time()
     theta = clda.infer_topics_gibbs(doc, topics)
-    print(time.time() - t)
 
     return {topic_ids[i]: weight for i,weight in enumerate(theta)}
 
@@ -145,6 +143,7 @@ def test(topics, alpha=0.0001):
 
     t = time.time()
     doc_topics = infer_topics_c(doc, topics)
+    print(time.time() - t)
     print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
 
     # doc_topics = infer_topics_collapsed(doc, topics, alpha=alpha)
