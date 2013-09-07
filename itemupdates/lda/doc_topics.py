@@ -150,19 +150,15 @@ def test(topics, alpha=0.0001):
     # print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
 
 topic_words = {}
-word_topics = collections.defaultdict(dict)
 # with open('lda-2500') as f:
 with open('lda.topToWor.txt') as f:
     for line in f:
         # topic, words = line.strip().split('\t')
         topic, words = line.strip().split(':', 1)
         # keys have commas and colons so we can't do nice split comprehensions :'(
-        words = {word: float(weight)
-                 # for word,weight,_ in re.findall(r'(.*?):([\d\.E\-]*?)(,|$)', words.strip('{}'))}
-                 for word,weight in re.findall(r'\((.*?),([\d\.E\-]*?)\)', words.strip('{}'))}
-        topic_words[topic] = words
-        for word,weight in words.items():
-            word_topics[word][topic] = weight
+        topic_words[topic] = {word: float(weight)
+                              # for word,weight,_ in re.findall(r'(.*?):([\d\.E\-]*?)(,|$)', words.strip('{}'))}
+                              for word,weight in re.findall(r'\((.*?),([\d\.E\-]*?)\)', words.strip('{}'))}
 
 
 doc = [w.lower() for w in sys.argv[1:]]
