@@ -70,7 +70,7 @@ static PyObject *clda_infer_topics_gibbs(PyObject *self, PyObject *args) {
   }
 
   PyObject *pytheta = PyList_New(K);
-  for (int k = 0; k < K; k++)
+  for (k = 0; k < K; k++)
     PyList_SET_ITEM(pytheta, k, PyFloat_FromDouble(sum_thetas[k] / n_thetas));
 
   free(doc);
