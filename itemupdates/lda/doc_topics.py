@@ -1,3 +1,5 @@
+import argparse
+import codecs
 import collections
 import operator
 import random
@@ -5,7 +7,7 @@ import re
 import sys
 import time
 
-import numpy as np
+#import numpy as np
 
 import clda
 
@@ -70,6 +72,7 @@ def infer_topics(doc, topics, alpha=0.0001, iterations=10000, burn=1000, thin=10
 
 def infer_topics_c(doc, topics):
     doc, topics = prep(doc, topics)
+    if not doc: return None # no known words
 
     topic_ids = list(topics.keys())
     topics = list(topics.values())
@@ -169,21 +172,31 @@ def parse_mahout(f):
     return topics
 
 def main():
-    # with open('lda-2500') as f:
-    with open('lda.topToWor.txt') as f:
-        topics = parse_yahoo(f)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('topics')
+    parser.add_argument('infile', nargs='?')
+    parser.add_argument('outfile', nargs='?', type=argparse.FileType('w'), default=sys.stdout)
+    args = parser.parse_args()
 
-    doc = [w.lower() for w in sys.argv[1:]]
+    with codecs.open(args.topics, encoding='utf8') as f:
+        if args.topics.endswith('.tsv'):
+            sys.stderr.write('parsing Mahout topics\n')
+            topics = parse_mahout(f)
+        else:
+            sys.stderr.write('parsing Yahoo topics\n')
+            topics = parse_yahoo(f)
 
-    if doc:
-        t = time.time()
-        doc_topics = infer_topics(doc, topics)
-        print(time.time() - t)
+    args.infile = codecs.open(args.infile, encoding='utf8') if args.infile else sys.stdin
 
-        print(sorted_by_value(doc_topics))
+    t = time.time()
+    for i,line in enumerate(args.infile):
+        if i > 0: sys.stderr.write('\r%d [%dms]' % (i, int(1000 * (time.time() - t) / i))); sys.stderr.flush()
+        id,doc = line.strip().split('\t', 1)
+        doc = doc.lower().split()
 
-    else:
-        test(topics)
+        doc_topics = infer_topics_c(doc, topics)
+        if doc_topics:
+            args.outfile.write('%s\t%s\n' % (id, repr({k: v for k,v in doc_topics.items() if v >= 0.01})))
 
 
 if __name__ == '__main__':
