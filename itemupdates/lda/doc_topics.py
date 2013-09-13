@@ -17,12 +17,6 @@ def sorted_by_value(d):
     if isinstance(d, dict): d = d.items()
     return sorted(d, key=snd, reverse=True)
 
-def factorial(n):
-    x = 1
-    for i in range(2, int(n) + 1):
-        x *= i
-    return x
-
 def prep(doc, topics):
     # TODO tokenize doc
     # throw out irrelevant topics:
@@ -35,7 +29,7 @@ def prep(doc, topics):
            if w in words]
     return doc, topics
 
-def infer_topics(doc, topics, alpha=0.0001, iterations=10000, burn=1000, thin=100):
+def infer_topics_gibbs(doc, topics, alpha=0.0001, iterations=10000, burn=1000, thin=100):
     doc, topics = prep(doc, topics)
 
     topic_ids = list(topics.keys())
@@ -45,7 +39,7 @@ def infer_topics(doc, topics, alpha=0.0001, iterations=10000, burn=1000, thin=10
     words = list(set(doc))
     doc = np.array([words.index(w) for w in doc], dtype=int)
     topics = np.array([[topic.get(w, 0) for w in words]
-                          for topic in topics])
+                       for topic in topics])
 
     if K == 0: return {}
 
@@ -70,6 +64,40 @@ def infer_topics(doc, topics, alpha=0.0001, iterations=10000, burn=1000, thin=10
     theta = sum_thetas / n_thetas
     return {topic_ids[i]: weight for i,weight in enumerate(theta)}
 
+def infer_topics_collapsed_gibbs(doc, topics, alpha=0.0001, iterations=10000, burn=1000, thin=100):
+    doc, topics = prep(doc, topics)
+
+    topic_ids = list(topics.keys())
+    topics = list(topics.values())
+    K = len(topics)
+
+    words = list(set(doc))
+    doc = np.array([words.index(w) for w in doc], dtype=int)
+    topics = np.array([[topic.get(w, 0) for w in words]
+                       for topic in topics])
+
+    if K == 0: return {}
+
+    n_thetas = 0
+    sum_thetas = np.zeros(K)
+    zs = np.empty(len(doc), dtype=int)
+    topic_counts = np.empty(K, dtype=int)
+    for j in range(iterations):
+        for i,w in enumerate(doc):
+            ps = gamma(topic_counts) * topics[:, w]
+            zs[i] = np.random.multinomial(1, ps / ps.sum()).argmax()
+
+        topic_counts.fill(0)
+        for z in zs: topic_counts[z] += 1
+
+        if j > burn and j % thin == 0:
+            theta = np.random.dirichlet(alpha + topic_counts)
+            sum_thetas += theta
+            n_thetas += 1
+
+    theta = sum_thetas / n_thetas
+    return {topic_ids[i]: weight for i,weight in enumerate(theta)}
+
 def infer_topics_c(doc, topics):
     doc, topics = prep(doc, topics)
     if not doc: return None # no known words
@@ -85,34 +113,6 @@ def infer_topics_c(doc, topics):
     theta = clda.infer_topics_gibbs(doc, topics)
 
     return {topic_ids[i]: weight for i,weight in enumerate(theta)}
-
-def infer_topics_collapsed(doc, topics, alpha=0.0001, iterations=10000, burn=1000, thin=100):
-    doc, topics = prep(doc, topics)
-
-    topic_ids = list(topics.keys())
-    topics = list(topics.values())
-    K = len(topics)
-
-    if K == 0: return {}
-
-    n_thetas = 0
-    sum_thetas = np.zeros(K)
-    zs = [None for _ in doc]
-    topic_counts = np.zeros(K)
-    for j in range(iterations):
-        for i,w in enumerate(doc):
-            if zs[i] is not None: topic_counts[zs[i]] -= 1
-            ps = np.array([topics[k].get(w, 0) * factorial(topic_counts[k])
-                              for k in range(K)])
-            zs[i] = np.random.multinomial(1, ps / ps.sum()).argmax()
-            topic_counts[zs[i]] += 1
-
-        if j > burn and j % thin == 0:
-            sum_thetas += np.random.dirichlet(alpha + topic_counts)
-            n_thetas += 1
-
-    theta = sum_thetas / n_thetas
-    return {topic_ids[k]: weight for k,weight in enumerate(theta)}
 
 def generate_doc(topics, alpha=0.0001):
     topic_ids = list(topics.keys())
@@ -140,7 +140,7 @@ def test(topics, alpha=0.0001):
     print(doc)
 
     t = time.time()
-    doc_topics = infer_topics(doc, topics, alpha=alpha)
+    doc_topics = infer_topics_gibbs(doc, topics, alpha=alpha)
     print(time.time() - t)
     print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
 
@@ -149,7 +149,7 @@ def test(topics, alpha=0.0001):
     print(time.time() - t)
     print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
 
-    # doc_topics = infer_topics_collapsed(doc, topics, alpha=alpha)
+    # doc_topics = infer_topics_collapsed_gibbs(doc, topics, alpha=alpha)
     # print(sorted_by_value({k:v for k,v in doc_topics.items() if v > 0.01}))
 
 def parse_yahoo(f):
